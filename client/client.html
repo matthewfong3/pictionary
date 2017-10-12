@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+      body{
+        background: #eee;
+        font-family: tahoma, verdana, sans serif;
+      }
+      
+      #drawSection, #chatSection {
+        width: 50%;
+        float: left;
+      }
+      
+      canvas {
+        border: 1px solid black;
+        margin: 0 auto;
+      }
+      
+      #controls{
+        margin-bottom: 3px;
+        text-align: center;
+      }
+      
+      label{
+        font-size: 12px;
+        margin-right: 0.75em;
+      }
+      
+      #chatSection {
+        margin-top: 27px;
+        text-align: center;
+      }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://npmcdn.com/babel-core@5.8.38/browser.min.js"></script>
+    <script type="text/babel">
+        "use strict";
+        
+        // canvas-related variables
+        let canvas;
+        let ctx;
+        let dragging = false;
+        let lineWidth;
+        let strokeStyle;
+
+        let DEFAULT_LINE_WIDTH = 3;
+        let DEFAULT_STROKE_STYLE = 'red';
+
+        let draws = {}; // object that will hold all of drawing information from server
+
+        let user; // variable to hold local client's username
+
+        const clientCoords = {
+          prevX: 0, prevY: 0, destX: 0, destY: 0,
+          lineWidth: DEFAULT_LINE_WIDTH, 
+          strokeStyle: DEFAULT_STROKE_STYLE,
+        };
+        
+        // Helper functions
+        const getMouse = (e) => {
+          return {
+            x: e.pageX - e.target.offsetLeft,
+		    y: e.pageY - e.target.offsetTop,
+          };
+        };
+
+        const doMouseDown = (e) => {
+          dragging = true;
+          var mouse = getMouse(e);
+          clientCoords.prevX = mouse.x;
+          clientCoords.prevY = mouse.y;
+          
+          clientCoords.destX = mouse.x;
+          clientCoords.destY = mouse.y;
+        };
+
+        const doMouseMove = (e) => {
+          if(!dragging){
+            clientCoords.destX = clientCoords.prevX;
+            clientCoords.destY = clientCoords.prevY;
+            return;
+          }
+          
+          var mouse = getMouse(e);
+          clientCoords.prevX = clientCoords.destX;
+          clientCoords.prevY = clientCoords.destY;
+          
+          clientCoords.destX = mouse.x;
+          clientCoords.destY = mouse.y;
+        };
+        
+        const doMouseUp = (e) => {
+          dragging = false;
+        };
+
+        const doMouseOut = (e) => {
+          dragging = false;
+        };
+        
+        // draws background canvas grid
+        const drawGrid = (ctx, color, cellWidth, cellHeight) => {
+          ctx.save();
+          ctx.strokeStyle = color;
+          ctx.fillStyle = '#fff';
+          ctx.lineWidth = 0.5;
+          ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+          
+          for(let x = cellWidth + 0.5; x < ctx.canvas.width; x += cellWidth){
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, ctx.canvas.height);
+            ctx.stroke();
+          }
+          
+          for(let y = cellWidth + 0.5; y < ctx.canvas.height; y += cellWidth){
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+            ctx.stroke();
+          }
+          
+          ctx.restore();
+        };
+
+        const doLineWidthChange = (e) => {
+          lineWidth = e.target.value;
+        };
+
+        const doStrokeStyleChange = (e) => {
+          strokeStyle = e.target.value;
+        };
+
+        const doClear = () => {
+          ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+          drawGrid(ctx, 'lightgray', 10, 10);
+        };
+
+        /*const doExport = () => {
+          let data = canvas.toDataURL();
+          console.dir(canvas);
+          let windowName = 'canvasImage';
+          let windowOptions = 'left=0,top=0,width=' + canvas.width + ',height=' + canvas.height + ',toolbar=0,resizeable=0';
+          
+          let myWindow = window.open(data, windowName, windowOptions);
+          
+          myWindow.resizeTo(canvas.width, canvas.height);
+        };*/
+        
+        // draws all the information onto canvas
+        const draw = () => {
+          let keys = Object.keys(draws);
+          
+          for(let i = 0; i < keys.length; i++){
+            const drawCall = draws[keys[i]];
+         
+            ctx.lineWidth = drawCall.lineWidth;
+            ctx.strokeStyle = drawCall.strokeStyle;
+            
+            ctx.beginPath();
+            ctx.moveTo(drawCall.prevX, drawCall.prevY);
+            ctx.lineTo(drawCall.destX, drawCall.destY);
+            ctx.closePath();
+            ctx.stroke();
+          }
+        };
+        
+        // handles new server response on client-side
+        const handleResponse = (data) => {
+          if(!draws[data.user]){
+            draws[data.user] = data.coords;
+          } else if(data.coords.lastUpdate > draws[data.user].lastUpdate){
+            draws[data.user] = data.coords;
+          }
+          
+          draw();
+        };
+        
+        // client listens for a new user join to server and they request the current canvas image
+        const updateOnJoin = (data) => {          
+          let image = new Image();
+          
+          image.src = data.imgData;
+          image.onload = () => {
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+          };
+          
+          console.log('received canvas image from other client');
+        };
+
+        const connectSocket = (e) => {
+          const socket = io.connect();
+          
+          // function for initial setup when user joins server room
+          const setup = () => {
+            const time = new Date().getTime();
+          
+            user = document.querySelector("#username").value;
+          
+            clientCoords.lastUpdate = time;
+          
+            draws[user] = clientCoords;
+          
+            socket.emit('join', {user: user, coords: clientCoords});
+          };
+          
+          // function to send new drawing updates to server
+          const update = () => {
+            const time = new Date().getTime();
+          
+            clientCoords.lastUpdate = time;
+          
+            clientCoords.lineWidth = lineWidth;
+            clientCoords.strokeStyle = strokeStyle;
+          
+            socket.emit('updateOnServer', {user: user, coords: clientCoords});
+          };
+          
+          // function to send messages to server
+          const sendMessage = (e) => {
+            let message = document.querySelector('#message').value;
+          
+            if(message) socket.emit('msgToServer', {user: user, msg: message});
+          };
+          
+          const send = document.querySelector('#send');
+          
+          socket.on('connect', () => {
+            setup(); // setup new user once
+            
+            // send update() to server
+            setInterval(update, 1);
+            
+            send.addEventListener('click', sendMessage);
+          });
+          
+          // when new user joins, grab a screenshot of current canvas
+          // send it to server and it will route it back to new user
+          socket.on('getCanvasImage', (data) => {
+            if(user === data.user){
+              socket.emit('sendCanvasImage', {imgData: canvas.toDataURL()});
+            }
+          });
+          
+          // if new user, they will receive a snapshot of canvas image 
+          // and draw it onto their canvas once they joined
+          socket.on('joined', updateOnJoin);
+          
+          // handles response from server and draws all info
+          socket.on('updateOnClient', handleResponse);
+          
+          // handles messages from server and displays them in chatbox
+          socket.on('msgToClient', (data) => {
+            var text = data.user + ": " + data.msg + '\n';
+            chat.innerHTML += text;
+          });
+        };
+        
+        const init = () => {
+          canvas = document.querySelector('#canvas');
+          ctx = canvas.getContext('2d');
+          
+          lineWidth = DEFAULT_LINE_WIDTH;
+          strokeStyle = DEFAULT_STROKE_STYLE;
+          
+          ctx.lineCape = 'round';
+          ctx.lineJoin = 'round';
+          
+          drawGrid(ctx, 'lightgray', 10, 10);
+          
+          canvas.onmousedown = doMouseDown;
+          canvas.onmousemove = doMouseMove;
+          canvas.onmouseup = doMouseUp;
+          canvas.onmouseout = doMouseOut;
+          
+          document.querySelector('#lineWidthChooser').onchange = doLineWidthChange; document.querySelector('#strokeStyleChooser').onchange = doStrokeStyleChange;
+          document.querySelector('#clearButton').onclick = doClear;
+          //document.querySelector('#exportButton').onclick = doExport;
+          
+          const connect = document.querySelector('#connect');
+          
+          connect.addEventListener('click', connectSocket);
+        };
+
+        window.onload = init;
+    </script>
+</head>
+<body>
+  <div id="drawSection">
+    <div id="controls">
+      <label>Tool:
+        <select id="toolChooser">
+          <option value="toolPencil">Pencil</option>
+        </select>
+      </label>
+      
+      <label>Stroke Style:
+        <select id="strokeStyleChooser">
+          <option value='red' selected>Red</option>
+          <option value='green'>Green</option>
+          <option value='blue'>Blue</option>
+          <option value='black'>Black</option>
+          <option value='orange'>Orange</option>
+          <option value='yellow'>Yellow</option>
+          <option value='cyan'>Cyan</option>
+          <option value='purple'>Purple</option>
+          <option value='gray'>Gray</option>
+        </select>
+      </label>
+      
+      <label>Line Width:
+        <select id="lineWidthChooser">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+        </select>
+      </label>
+      
+      <span><input id='clearButton' type='button' value='Clear'/></span>
+      
+      <!--<span><input id='exportButton' type='button' value='Export'/></span>-->
+    </div>
+    <canvas id="canvas" width="800" height="600"></canvas>
+  </div>
+  
+  <div id="chatSection">
+    <textarea id="chat" rows="25" cols="60" readonly></textarea>
+    <br>
+    <label for="user">Username:</label>
+	<input id="username" name="user" type="text"/>
+	<input id="connect" type='button' value='connect'/>
+    <br/>
+    <label for="message">Message:</label>
+    <input id="message" name="message" type="text"/>
+    <input id="send" type="button" value="send"/>
+  </div>
+</body>
+</html>

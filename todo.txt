@@ -1,0 +1,6 @@
+4 players required to play a game
+random words array
+designate random drawer and the rest and guessers
+score system (first to 3)
+correct guesser draws next
+multiple rooms
