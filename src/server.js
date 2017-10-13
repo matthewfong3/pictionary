@@ -22,12 +22,13 @@ const io = socketio(app);
 
 const clientObjs = {};
 
-let socketID; // holds a new user's ID so server can refer back to when sending back canvas image data
+// holds a new user's ID so server can refer back to when sending back canvas image data
+let socketID;
 
 let drawer;
-let guessers;
 
-let randoWord = 'tree';
+const randoWords = ['tree', 'flower', 'house', 'bus', 'airplane', 'boat', 'truck', 'train', 'cat', 'dog', 'turtle', 'key', 'cup', 'fork', 'spoon', 'chair', 'table', 'toilet', 'pencil', 'book', 'door', 'rug', 'television', 'phone', 'refrigerator', 'plunger', 'bag', 'bottle', 'acorn', 'cheese', 'apple', 'banana', 'money', 'clock', 'bed', 'scissor', 'jeans', 'shirt', 'boots', 'slippers', 'microwave', 'toaster', 'toothbrush', 'hand', 'leg', 'mouth', 'eye', 'nose', 'ear', 'mail', 'lamp', 'pan', 'spatula', 'bread', 'egg', 'scarf', 'gloves', 'socks', 'bell', 'stairs', 'sun', 'cloud', 'fish', 'earth', 'can', 'milk', 'strawberry', 'ice cream', 'ice cube', 'fire', 'syringe', 'umbrella', 'tie', 'stapler', 'horse', 'moon', 'sign', 'fence'];
+let randoWord, randoInd;
 
 io.sockets.on('connection', (sock) => {
   const socket = sock;
@@ -39,10 +40,10 @@ io.sockets.on('connection', (sock) => {
       clientObjs[data.user] = {};
       clientObjs[data.user].user = data.user;
       clientObjs[data.user].id = socket.id;
-      
+
       clientObjs[data.user].drawer = false;
       clientObjs[data.user].points = 0;
-      
+
       // set coords for drawing
       clientObjs[data.user].coords = data.coords;
     }
@@ -65,14 +66,17 @@ io.sockets.on('connection', (sock) => {
 
     if (keys.length === 4) {
       io.sockets.in('room1').emit('msgToClient', { user: 'server', msg: 'Ready to start Pictionary game' });
-      
+
       let randoIndex = Math.random() * 4;
       randoIndex = Math.floor(randoIndex);
       drawer = clientObjs[keys[randoIndex]];
       clientObjs[keys[randoIndex]].drawer = true;
       console.log(drawer);
-  
-      io.sockets.connected[drawer.id].emit('msgToClient', {user: 'server', msg: 'You are the drawer! Your word is ' + randoWord});
+      
+      randoInd = Math.floor(Math.random() * randoWords.length);
+      randoWord = randoWords[randoInd];
+
+      io.sockets.connected[drawer.id].emit('msgToClient', { user: 'server', msg: `You are the drawer! Your word is ${randoWord}` });
     }
   });
 
@@ -94,18 +98,30 @@ io.sockets.on('connection', (sock) => {
 
   // sends message back to clients in room
   socket.on('msgToServer', (data) => {
+    io.sockets.in('room1').emit('msgToClient', { user: data.user, msg: data.msg });
+    
     // check to see if guesser's message matches drawer's word
-    if(data.msg === randoWord && !clientObjs[data.user].drawer){
-      io.sockets.in('room1').emit('msgToClient', { user: 'server', msg: data.user + ' guessed correctly' });
+    if (data.msg === randoWord && !clientObjs[data.user].drawer) {
+      io.sockets.in('room1').emit('msgToClient', { user: 'server', msg: `${data.user} guessed correctly` });
       // give the user a point
       clientObjs[data.user].points++;
+      
+      let keys = Object.keys(clientObjs);
+      for(let i = 0; i < keys.length; i++){
+        if(clientObjs[keys[i]].drawer){
+          clientObjs[keys[i]].drawer = false
+        }
+      }
+      
       // assign them to new drawer and give them new word
-      drawer = clientObjs[data.user]; 
-      clientObjs[data.user].drawer = true; // but before we do this, we need to set the previous clientObj[].drawer = false
-      // everybody else is a guesser
-    }
+      drawer = clientObjs[data.user];
+      clientObjs[data.user].drawer = true;
 
-    io.sockets.in('room1').emit('msgToClient', { user: data.user, msg: data.msg });
+      randoInd = Math.floor(Math.random() * randoWords.length);
+      randoWord = randoWords[randoInd];
+      
+      io.sockets.connected[drawer.id].emit('msgToClient', { user: 'server', msg: `You are the drawer! Your word is ${randoWord}` });
+    }
   });
 
   // handles disconnects
