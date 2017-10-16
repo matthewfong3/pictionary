@@ -7,7 +7,7 @@
         font-family: tahoma, verdana, sans serif;
       }
       
-      #drawSection, #chatSection {
+      #drawSection, #chatSection, #scoreSection {
         width: 50%;
         float: left;
       }
@@ -29,6 +29,10 @@
       
       #chatSection {
         margin-top: 27px;
+        text-align: center;
+      }
+      
+      #scoreSection{
         text-align: center;
       }
     </style>
@@ -55,6 +59,7 @@
           prevX: 0, prevY: 0, destX: 0, destY: 0,
           lineWidth: DEFAULT_LINE_WIDTH, 
           strokeStyle: DEFAULT_STROKE_STYLE,
+          room: 1, roomMember: 1,
         };
         
         // Helper functions
@@ -98,31 +103,6 @@
           dragging = false;
         };
         
-        // draws background canvas grid
-        const drawGrid = (ctx, color, cellWidth, cellHeight) => {
-          ctx.save();
-          ctx.strokeStyle = color;
-          ctx.fillStyle = '#fff';
-          ctx.lineWidth = 0.5;
-          ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-          
-          for(let x = cellWidth + 0.5; x < ctx.canvas.width; x += cellWidth){
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, ctx.canvas.height);
-            ctx.stroke();
-          }
-          
-          for(let y = cellWidth + 0.5; y < ctx.canvas.height; y += cellWidth){
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(canvas.width, y);
-            ctx.stroke();
-          }
-          
-          ctx.restore();
-        };
-
         const doLineWidthChange = (e) => {
           lineWidth = e.target.value;
         };
@@ -133,19 +113,10 @@
 
         const doClear = () => {
           ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-          drawGrid(ctx, 'lightgray', 10, 10);
+          //drawGrid(ctx, 'lightgray', 10, 10);
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         };
-
-        /*const doExport = () => {
-          let data = canvas.toDataURL();
-          console.dir(canvas);
-          let windowName = 'canvasImage';
-          let windowOptions = 'left=0,top=0,width=' + canvas.width + ',height=' + canvas.height + ',toolbar=0,resizeable=0';
-          
-          let myWindow = window.open(data, windowName, windowOptions);
-          
-          myWindow.resizeTo(canvas.width, canvas.height);
-        };*/
         
         // draws all the information onto canvas
         const draw = () => {
@@ -215,7 +186,7 @@
           
             clientCoords.lineWidth = lineWidth;
             clientCoords.strokeStyle = strokeStyle;
-          
+           
             socket.emit('updateOnServer', {user: user, coords: clientCoords});
           };
           
@@ -223,10 +194,14 @@
           const sendMessage = (e) => {
             let message = document.querySelector('#message').value;
           
-            if(message) socket.emit('msgToServer', {user: user, msg: message});
+            if(message) socket.emit('msgToServer', {user: user, msg: message, coords: clientCoords});
           };
           
           const send = document.querySelector('#send');
+          
+          const sendClearCommand = (e) => {
+            socket.emit('clearCommand', {user: user, coords: clientCoords});
+          };
           
           socket.on('connect', () => {
             setup(); // setup new user once
@@ -235,6 +210,8 @@
             setInterval(update, 1);
             
             send.addEventListener('click', sendMessage);
+            
+            document.querySelector('#clearButton').onclick = sendClearCommand;
           });
           
           // when new user joins, grab a screenshot of current canvas
@@ -245,17 +222,48 @@
             }
           });
           
+          socket.on('updateRoom', (data) => {
+            clientCoords.room = data.room;
+            clientCoords.roomMember = data.roomMember;
+            console.log(clientCoords.room);
+            console.log(clientCoords.roomMember);
+          });
+          
           // if new user, they will receive a snapshot of canvas image 
           // and draw it onto their canvas once they joined
           socket.on('joined', updateOnJoin);
           
+          socket.on('clearCanvas', doClear);
+          
+          const scoreSection = document.querySelector('#scoreSection');
+          
+          socket.on('displayPoints', (data) => {
+            let p = document.createElement('p');
+            p.setAttribute('name', data.user);
+            p.innerHTML = data.user + "'s points: " + data.points;
+            scoreSection.appendChild(p);
+          });
+          
+          socket.on('updatePoints', (data) => {
+            let userPoints = document.getElementsByName(data.user);
+            userPoints[0].innerHTML = data.user + "'s points: " + data.points;
+          });
+          
           // handles response from server and draws all info
           socket.on('updateOnClient', handleResponse);
           
+          const chatarea = document.getElementById('chat');
+          
           // handles messages from server and displays them in chatbox
           socket.on('msgToClient', (data) => {
-            var text = data.user + ": " + data.msg + '\n';
-            chat.innerHTML += text;
+            chatarea.scrollTop = chatarea.scrollHeight;
+            
+            if(data.clear) chat.innerHTML = '';
+            
+            if(data.msg){
+              let text = data.user + ": " + data.msg + '\n';
+              chat.innerHTML += text;
+            }
           });
         };
         
@@ -269,7 +277,9 @@
           ctx.lineCape = 'round';
           ctx.lineJoin = 'round';
           
-          drawGrid(ctx, 'lightgray', 10, 10);
+          //drawGrid(ctx, 'lightgray', 10, 10);
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
           
           canvas.onmousedown = doMouseDown;
           canvas.onmousemove = doMouseMove;
@@ -277,11 +287,8 @@
           canvas.onmouseout = doMouseOut;
           
           document.querySelector('#lineWidthChooser').onchange = doLineWidthChange; document.querySelector('#strokeStyleChooser').onchange = doStrokeStyleChange;
-          document.querySelector('#clearButton').onclick = doClear;
-          //document.querySelector('#exportButton').onclick = doExport;
           
           const connect = document.querySelector('#connect');
-          
           connect.addEventListener('click', connectSocket);
         };
 
@@ -327,8 +334,6 @@
       </label>
       
       <span><input id='clearButton' type='button' value='Clear'/></span>
-      
-      <!--<span><input id='exportButton' type='button' value='Export'/></span>-->
     </div>
     <canvas id="canvas" width="800" height="600"></canvas>
   </div>
@@ -343,6 +348,8 @@
     <label for="message">Message:</label>
     <input id="message" name="message" type="text"/>
     <input id="send" type="button" value="send"/>
+  </div>
+  <div id="scoreSection">
   </div>
 </body>
 </html>
