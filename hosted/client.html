@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://npmcdn.com/babel-core@5.8.38/browser.min.js"></script>
+    <script src="bundle.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/client.css">
+</head>
+<body>
+  <h1>Pictionary</h1>
+  <div id="drawSection">
+    <div id="controls">
+      <label>Tool:
+        <select id="toolChooser">
+          <option value="toolPencil">Pencil</option>
+        </select>
+      </label>
+      
+      <label>Stroke Style:
+        <select id="strokeStyleChooser">
+          <option value='black' selected>Black</option>
+          <option value='gray'>Gray</option>
+          <option value='brown'>Brown</option>
+          <option value='white'>White</option>
+          <option value='red'>Red</option>
+          <option value='green'>Green</option>
+          <option value='blue'>Blue</option>
+          <option value='yellow'>Yellow</option>
+          <option value='gold'>Gold</option>
+          <option value='orange'>Orange</option>
+          <option value='lightgreen'>LightGreen</option>
+          <option value='cyan'>Cyan</option>
+          <option value='aqua'>Aqua</option>
+          <option value='turquoise'>Turquoise</option>
+          <option value='teal'>Teal</option>
+          <option value='lightblue'>LightBlue</option>
+          <option value='skyblue'>SkyBlue</option>
+          <option value='pink'>Pink</option>
+          <option value='violet'>Violet</option>
+          <option value='purple'>Purple</option>
+          <option value='indigo'>Indigo</option>
+          <option value='magenta'>Magenta</option>
+        </select>
+      </label>
+      
+      <label>Line Width:
+        <select id="lineWidthChooser">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+        </select>
+      </label>
+      
+      <span><input id='clearButton' type='button' value='Clear'/></span>
+    </div>
+    <canvas id="canvas" width="800" height="600"></canvas>
+  </div>
+  
+  <div id="chatSection">
+    <textarea id="chat" rows="25" cols="60" readonly></textarea>
+    <br>
+    <label for="user">Username:</label>
+	<input id="username" name="user" type="text"/>
+	<input id="connect" type='button' value='connect'/>
+    <br/>
+    <label for="message">Message:</label>
+    <input id="message" name="message" type="text"/>
+    <input id="send" type="button" value="send"/>
+  </div>
+  <div id="scoreSection">
+  </div>
+</body>
+</html>

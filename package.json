@@ -8,6 +8,8 @@
   "description": "real time project 1",
   "main": "./src/server.js",
   "scripts": {
+    "build": "babel ./client --out-file ./hosted/bundle.js",
+    "watch": "babel --watch ./client/js --out-file ./hosted/bundle.js",
     "test": "echo \"Tests complete\"",
     "start": "node ./src/server.js",
     "pretest": "eslint ./src --fix"
@@ -15,6 +17,8 @@
   "author": "Matthew Fong",
   "license": "ISC",
   "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-preset-env": "^1.6.1",
     "eslint": "^4.8.0",
     "eslint-config-airbnb": "^15.1.0",
     "eslint-plugin-import": "^2.7.0"
