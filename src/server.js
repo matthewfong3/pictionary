@@ -14,7 +14,7 @@ const onRequest = (request, response) => {
   } else if (request.url === '/bundle.js') {
     fs.readFile(`${__dirname}/../hosted/bundle.js`, (err, data) => {
       if (err) throw err;
-      response.writeHead(200, { 'Content-Type': 'application/javaascript' });
+      response.writeHead(200, { 'Content-Type': 'application/javascript' });
       response.end(data);
     });
   } else {
