@@ -18,7 +18,7 @@ const clientCoords = {
   prevX: 0, prevY: 0, destX: 0, destY: 0,
   lineWidth: DEFAULT_LINE_WIDTH, 
   strokeStyle: DEFAULT_STROKE_STYLE,
-  room: 1, roomMember: 1,
+  roomNum: 1, roomMember: 1,
 };
 
 // Helper functions
@@ -31,7 +31,9 @@ const getMouse = (e) => {
 
 const doMouseDown = (e) => {
   dragging = true;
+
   var mouse = getMouse(e);
+
   clientCoords.prevX = mouse.x;
   clientCoords.prevY = mouse.y;
   
@@ -43,10 +45,12 @@ const doMouseMove = (e) => {
   if(!dragging){
     clientCoords.destX = clientCoords.prevX;
     clientCoords.destY = clientCoords.prevY;
+
     return;
   }
   
   var mouse = getMouse(e);
+
   clientCoords.prevX = clientCoords.destX;
   clientCoords.prevY = clientCoords.destY;
   
@@ -72,7 +76,6 @@ const doStrokeStyleChange = (e) => {
 
 const doClear = () => {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  //drawGrid(ctx, 'lightgray', 10, 10);
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 };
@@ -95,18 +98,15 @@ const draw = () => {
   }
 };
 
-// handles new server response on client-side
+// handles new incoming server response on client-side
 const handleResponse = (data) => {
-  if(!draws[data.user]){
-    draws[data.user] = data.coords;
-  } else if(data.coords.lastUpdate > draws[data.user].lastUpdate){
-    draws[data.user] = data.coords;
-  }
+  if(!draws[data.user]) draws[data.user] = data.coords;
+  else if(data.coords.lastUpdate > draws[data.user].lastUpdate) draws[data.user] = data.coords;
   
   draw();
 };
 
-// client listens for a new user join to server and they request for the current canvas image
+// function that will draw the received canvas image data onto the client's canvas
 const updateOnJoin = (data) => {          
   let image = new Image();
   
@@ -123,6 +123,9 @@ const updateOnJoin = (data) => {
 
 const connectSocket = (e) => {
   const socket = io.connect();
+
+  const scoreSection = document.querySelector('#scoreSection');
+  const chatarea = document.getElementById('chat');
   
   // function for initial setup when user joins server room
   const setup = () => {
@@ -134,7 +137,25 @@ const connectSocket = (e) => {
   
     draws[user] = clientCoords;
   
+    // client emits a 'join' event to server
     socket.emit('join', {user: user, coords: clientCoords});
+
+    // reset (clear) the value of message element on focus
+    const message = document.querySelector('#message');
+    message.onfocus = () => { message.value = ''; };
+
+    // set up enter key press
+    message.addEventListener('keyup', (e) => {
+      e.preventDefault();
+      if(e.keyCode === 13){
+        sendMessage();
+        message.value = '';
+      }
+        
+    });
+    
+    document.querySelector('#send').onclick = sendMessage;
+    document.querySelector('#clearButton').onclick = sendClearCommand;
   };
   
   // function to send new drawing updates to server
@@ -161,48 +182,28 @@ const connectSocket = (e) => {
     if(msgVal) socket.emit('msgToServer', {user: user, msg: msgVal, coords: clientCoords});
   };
   
-  const message = document.querySelector('#message');
-  message.onfocus = () => { message.value = ''; };
-  
   socket.on('connect', () => {
     setup(); // setup new user once
     
     setInterval(update, 1); // send update() to server
-    
-    // set up enter key press
-    message.addEventListener('keyup', (e) => {
-      e.preventDefault();
-      if(e.keyCode === 13){
-        sendMessage();
-        message.value = '';
-      }
-        
-    });
-    document.querySelector('#send').onclick = sendMessage;
-    document.querySelector('#clearButton').onclick = sendClearCommand;
   });
   
   // when new user joins, grab a screenshot of current canvas
   // send it to server and it will route it back to new user
   socket.on('getCanvasImage', (data) => {
-    if(user === data.user){
-      socket.emit('sendCanvasImage', {imgData: canvas.toDataURL()});
-    }
+    if(user === data.user) socket.emit('sendCanvasImage', {imgData: canvas.toDataURL()});
   });
   
-  // save user's room number and member on client-side
+  // save user's roomNumber and roomMember on client-side
   socket.on('updateRoom', (data) => {
-    clientCoords.room = data.room;
+    clientCoords.roomNum = data.roomNum;
     clientCoords.roomMember = data.roomMember;
   });
   
-  // if new user, they will receive a snapshot of canvas image 
-  // and draw it onto their canvas once they joined
+  // if new user, they will receive a snapshot of canvas image and draw it onto their canvas once they joined
   socket.on('joined', updateOnJoin);
   
   socket.on('clearCanvas', doClear);
-  
-  const scoreSection = document.querySelector('#scoreSection');
   
   // display initial points
   socket.on('displayPoints', (data) => {
@@ -220,8 +221,6 @@ const connectSocket = (e) => {
   
   // handles response from server and draws all info
   socket.on('updateOnClient', handleResponse);
-  
-  const chatarea = document.getElementById('chat');
   
   // handles messages from server and displays them in chatbox
   socket.on('msgToClient', (data) => {

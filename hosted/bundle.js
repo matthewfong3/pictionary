@@ -19,7 +19,7 @@ var clientCoords = {
   prevX: 0, prevY: 0, destX: 0, destY: 0,
   lineWidth: DEFAULT_LINE_WIDTH,
   strokeStyle: DEFAULT_STROKE_STYLE,
-  room: 1, roomMember: 1
+  roomNum: 1, roomMember: 1
 };
 
 // Helper functions
@@ -32,7 +32,9 @@ var getMouse = function getMouse(e) {
 
 var doMouseDown = function doMouseDown(e) {
   dragging = true;
+
   var mouse = getMouse(e);
+
   clientCoords.prevX = mouse.x;
   clientCoords.prevY = mouse.y;
 
@@ -44,10 +46,12 @@ var doMouseMove = function doMouseMove(e) {
   if (!dragging) {
     clientCoords.destX = clientCoords.prevX;
     clientCoords.destY = clientCoords.prevY;
+
     return;
   }
 
   var mouse = getMouse(e);
+
   clientCoords.prevX = clientCoords.destX;
   clientCoords.prevY = clientCoords.destY;
 
@@ -73,7 +77,6 @@ var doStrokeStyleChange = function doStrokeStyleChange(e) {
 
 var doClear = function doClear() {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  //drawGrid(ctx, 'lightgray', 10, 10);
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 };
@@ -96,18 +99,14 @@ var draw = function draw() {
   }
 };
 
-// handles new server response on client-side
+// handles new incoming server response on client-side
 var handleResponse = function handleResponse(data) {
-  if (!draws[data.user]) {
-    draws[data.user] = data.coords;
-  } else if (data.coords.lastUpdate > draws[data.user].lastUpdate) {
-    draws[data.user] = data.coords;
-  }
+  if (!draws[data.user]) draws[data.user] = data.coords;else if (data.coords.lastUpdate > draws[data.user].lastUpdate) draws[data.user] = data.coords;
 
   draw();
 };
 
-// client listens for a new user join to server and they request for the current canvas image
+// function that will draw the received canvas image data onto the client's canvas
 var updateOnJoin = function updateOnJoin(data) {
   var image = new Image();
 
@@ -125,6 +124,9 @@ var updateOnJoin = function updateOnJoin(data) {
 var connectSocket = function connectSocket(e) {
   var socket = io.connect();
 
+  var scoreSection = document.querySelector('#scoreSection');
+  var chatarea = document.getElementById('chat');
+
   // function for initial setup when user joins server room
   var setup = function setup() {
     var time = new Date().getTime();
@@ -135,7 +137,26 @@ var connectSocket = function connectSocket(e) {
 
     draws[user] = clientCoords;
 
+    // client emits a 'join' event to server
     socket.emit('join', { user: user, coords: clientCoords });
+
+    // reset (clear) the value of message element on focus
+    var message = document.querySelector('#message');
+    message.onfocus = function () {
+      message.value = '';
+    };
+
+    // set up enter key press
+    message.addEventListener('keyup', function (e) {
+      e.preventDefault();
+      if (e.keyCode === 13) {
+        sendMessage();
+        message.value = '';
+      }
+    });
+
+    document.querySelector('#send').onclick = sendMessage;
+    document.querySelector('#clearButton').onclick = sendClearCommand;
   };
 
   // function to send new drawing updates to server
@@ -162,49 +183,28 @@ var connectSocket = function connectSocket(e) {
     if (msgVal) socket.emit('msgToServer', { user: user, msg: msgVal, coords: clientCoords });
   };
 
-  var message = document.querySelector('#message');
-  message.onfocus = function () {
-    message.value = '';
-  };
-
   socket.on('connect', function () {
     setup(); // setup new user once
 
     setInterval(update, 1); // send update() to server
-
-    // set up enter key press
-    message.addEventListener('keyup', function (e) {
-      e.preventDefault();
-      if (e.keyCode === 13) {
-        sendMessage();
-        message.value = '';
-      }
-    });
-    document.querySelector('#send').onclick = sendMessage;
-    document.querySelector('#clearButton').onclick = sendClearCommand;
   });
 
   // when new user joins, grab a screenshot of current canvas
   // send it to server and it will route it back to new user
   socket.on('getCanvasImage', function (data) {
-    if (user === data.user) {
-      socket.emit('sendCanvasImage', { imgData: canvas.toDataURL() });
-    }
+    if (user === data.user) socket.emit('sendCanvasImage', { imgData: canvas.toDataURL() });
   });
 
-  // save user's room number and member on client-side
+  // save user's roomNumber and roomMember on client-side
   socket.on('updateRoom', function (data) {
-    clientCoords.room = data.room;
+    clientCoords.roomNum = data.roomNum;
     clientCoords.roomMember = data.roomMember;
   });
 
-  // if new user, they will receive a snapshot of canvas image 
-  // and draw it onto their canvas once they joined
+  // if new user, they will receive a snapshot of canvas image and draw it onto their canvas once they joined
   socket.on('joined', updateOnJoin);
 
   socket.on('clearCanvas', doClear);
-
-  var scoreSection = document.querySelector('#scoreSection');
 
   // display initial points
   socket.on('displayPoints', function (data) {
@@ -222,8 +222,6 @@ var connectSocket = function connectSocket(e) {
 
   // handles response from server and draws all info
   socket.on('updateOnClient', handleResponse);
-
-  var chatarea = document.getElementById('chat');
 
   // handles messages from server and displays them in chatbox
   socket.on('msgToClient', function (data) {

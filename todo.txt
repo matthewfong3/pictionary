@@ -1,3 +1,10 @@
+NEW:
+-get rid of globals?
+-make app prettier?
+-new disconnect handling logic?
+	-instead of terminating game when someone disconnects, wait 	for a new client to connect?
+
+OLD:
 -4 players required to play a game
 -random words array
 -designate random drawer and the rest and guessers
@@ -20,7 +27,7 @@ TOFIX:
 	-in multiple rooms, get canvas image from first person connected in their rooms
 	-cant use drawer variable on server
 	-when there is a winner, clear the text section first & auto scroll chat section
-	~announce to all 'guessers' who the drawer is each round (socket.emit is wrong)
+	-announce to all 'guessers' who the drawer is each round (socket.emit is wrong)
 	-CSS and prettify
 	-press enter to submit message
 	-more colors to draw with

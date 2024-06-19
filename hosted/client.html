@@ -8,6 +8,7 @@
 </head>
 <body>
   <h1>Pictionary</h1>
+
   <div id="drawSection">
     <div id="controls">
       <label>Tool:
@@ -60,21 +61,23 @@
       
       <span><input id='clearButton' type='button' value='Clear'/></span>
     </div>
+
     <canvas id="canvas" width="800" height="600"></canvas>
+
   </div>
   
   <div id="chatSection">
     <textarea id="chat" rows="25" cols="60" readonly></textarea>
     <br>
     <label for="user">Username:</label>
-	<input id="username" name="user" type="text"/>
-	<input id="connect" type='button' value='connect'/>
+	  <input id="username" name="user" type="text"/>
+	  <input id="connect" type='button' value='connect'/>
     <br/>
     <label for="message">Message:</label>
     <input id="message" name="message" type="text"/>
     <input id="send" type="button" value="send"/>
   </div>
-  <div id="scoreSection">
-  </div>
+
+  <div id="scoreSection"></div>
 </body>
 </html>
