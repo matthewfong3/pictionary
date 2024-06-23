@@ -14,16 +14,14 @@ const onRequest = (request, response) => {
       response.writeHead(200, { 'Content-Type': 'text/css' });
       response.end(data);
     });
-  } 
-  else if (request.url === '/bundle.js') {
+  } else if (request.url === '/bundle.js') {
     fs.readFile(`${__dirname}/../hosted/bundle.js`, (err, data) => {
       if (err) throw err;
 
       response.writeHead(200, { 'Content-Type': 'application/javascript' });
       response.end(data);
     });
-  } 
-  else {
+  } else {
     fs.readFile(`${__dirname}/../hosted/client.html`, (err, data) => {
       if (err) throw err;
 
@@ -44,7 +42,9 @@ app.listen(port, (err) => {
 // connect app to socket.io
 const io = socketio(app);
 
-let socketID; // holds a newly connected user's ID, so server can refer back to when sending back canvas image data (snapshot of canvas)
+// holds a newly connected user's ID, 
+// so server can refer back to when sending back canvas image data (snapshot of canvas)
+let socketID;
 
 const rooms = {};
 let roomNum = 1;
@@ -53,12 +53,13 @@ let roomMember = 1;
 const randoWords = ['tree', 'flower', 'house', 'bus', 'airplane', 'boat', 'truck', 'train', 'cat', 'dog', 'turtle', 'key', 'cup', 'fork', 'spoon', 'chair', 'table', 'toilet', 'pencil', 'book', 'door', 'rug', 'television', 'phone', 'refrigerator', 'plunger', 'bag', 'bottle', 'acorn', 'cheese', 'apple', 'banana', 'money', 'clock', 'bed', 'scissor', 'jeans', 'shirt', 'boots', 'slippers', 'microwave', 'toaster', 'toothbrush', 'hand', 'leg', 'mouth', 'eye', 'nose', 'ear', 'mail', 'lamp', 'pan', 'spatula', 'bread', 'egg', 'scarf', 'gloves', 'socks', 'bell', 'stairs', 'sun', 'cloud', 'fish', 'earth', 'can', 'milk', 'strawberry', 'ice cream', 'ice cube', 'fire', 'syringe', 'umbrella', 'tie', 'stapler', 'horse', 'moon', 'sign', 'fence'];
 
 // a pictionary game is ready to begin when 4 users are connected in the same room
-// the game will begin when keys.length of rooms[roomNumber] is 6 (4 room members, .drawer property exists, .randoWord property exists)
+// the game will begin when keys.length of rooms[roomNumber] is 6,
+// (4 room members, .drawer property exists, .randoWord property exists)
 // function that initializes settings for a pictionary game
 const initGame = () => {
   // clear all canvas and send server message to all
   io.sockets.in(`room${rooms[`room${roomNum}`][`roomMember${roomMember}`].coords.roomNum}`).emit('clearCanvas', { user: 'server' });
-  io.sockets.in(`room${rooms[`room${roomNum}`][`roomMember${roomMember}`].coords.roomNum}`).emit('msgToClient', { user: 'server', msg: 'Ready to start Pictionary game' });
+  io.sockets.in(`room${rooms[`room${roomNum}`][`roomMember${roomMember}`].coords.roomNum}`).emit('msgToClient', { user: 'server', msg: 'Ready to start the game!' });
 
   // display initial points
   for (let i = 1; i <= roomMember; i++) {
@@ -162,10 +163,10 @@ io.sockets.on('connection', (sock) => {
 
     // broadcast to all other connected clients that a new user has joined
     socket.broadcast.to(`room${rooms[`room${roomNum}`][`roomMember${roomMember}`].coords.roomNum}`).emit('msgToClient', { user: 'server', msg: `${data.user} has joined the room.` });
-    
+
     // message to new user to confirm they have joined
     socket.emit('msgToClient', { user: 'server', msg: 'You joined the room' });
-    
+
     // update new user's room on client-side
     socket.emit('updateRoom', { roomNum: rooms[`room${roomNum}`][`roomMember${roomMember}`].coords.roomNum, roomMember: rooms[`room${roomNum}`][`roomMember${roomMember}`].coords.roomMember });
 
@@ -197,8 +198,7 @@ io.sockets.on('connection', (sock) => {
         if (rooms[`room${data.coords.roomNum}`][`roomMember${data.coords.roomMember}`].drawer) {
           io.sockets.in(`room${data.coords.roomNum}`).emit('clearCanvas', { user: 'server' });
         }
-      } 
-      else io.sockets.in(`room${data.coords.roomNum}`).emit('clearCanvas', { user: 'server' });
+      } else io.sockets.in(`room${data.coords.roomNum}`).emit('clearCanvas', { user: 'server' });
     }
   });
 
@@ -230,6 +230,7 @@ io.sockets.on('connection', (sock) => {
       const keys = Object.keys(rooms[`room${data.coords.roomNum}`]);
 
       // if game has started, only allow non-drawers (guessers) to send messages
+      // else, before game starts, anyone can send messages
       if (keys.length === 6) {
         if (!rooms[`room${data.coords.roomNum}`][`roomMember${data.coords.roomMember}`].drawer) {
           io.sockets.in(`room${data.coords.roomNum}`).emit('msgToClient', { user: data.user, msg: data.msg });
@@ -237,9 +238,7 @@ io.sockets.on('connection', (sock) => {
           // check to see if guesser's message matches drawer's word
           if (data.msg === rooms[`room${data.coords.roomNum}`].randoWord) handleWordMatch(data, socket);
         }
-      } 
-      // else, before game starts, anyone can send messages
-      else io.sockets.in(`room${data.coords.roomNum}`).emit('msgToClient', { user: data.user, msg: data.msg });
+      } else io.sockets.in(`room${data.coords.roomNum}`).emit('msgToClient', { user: data.user, msg: data.msg });
     }
   });
 

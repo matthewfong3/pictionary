@@ -40,3 +40,11 @@ label {
 p {
   font-size: 18px;
 }
+
+#send,
+#connect,
+#clearButton{
+  border-radius: 5px;
+  min-width: 50px;
+  min-height: 25px;
+}
